@@ -31,15 +31,14 @@
 package p2t
 
 import (
-	"fmt"
-	"container/vector"
 	"container/list"
+	"fmt"
 	"sort"
 )
 
 type Point struct {
 	X, Y      float64
-	edge_list vector.Vector
+	edge_list [](*Edge)
 }
 
 // PointArray attaches the methods of Interface to []*Point, sorting in increasing order.
@@ -104,7 +103,7 @@ func (e *Edge) init(p1, p2 *Point) {
 			panic(fmt.Sprintf("repeat Point"))
 		}
 	}
-	e.q.edge_list.Push(e)
+	e.q.edge_list = append(e.q.edge_list, e)
 }
 
 func (t *Triangle) containsPoint(p *Point) bool {
