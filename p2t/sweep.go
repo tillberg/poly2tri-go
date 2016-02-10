@@ -275,11 +275,15 @@ func initSweepEdgeEvent(tcx *SweepContext, edge *Edge, node *Node) {
 		return
 	}
 
+	if node.triangle == nil {
+		panic("initSweepEdgeEvent has node with no triangle")
+	}
+
 	// For now we will do all needed filling
 	// TODO: integrate with flip process might give some better performance
 	//       but for now this avoid the issue with cases that needs both flips and fills
 	fillEdgeEvent(tcx, edge, node)
-	sweepEdgeEvent(tcx, edge.p, edge.q, node.triangle, edge.q)
+	sweepEdgeEvent(tcx, edge.p, edge.q, node.triangle, edge.q, 0)
 }
 
 func fillAdvancingFront(tcx *SweepContext, n *Node) {
@@ -317,10 +321,18 @@ func fillAdvancingFront(tcx *SweepContext, n *Node) {
 	}
 }
 
-func sweepEdgeEvent(tcx *SweepContext, ep, eq *Point, triangle *Triangle, point *Point) {
+func sweepEdgeEvent(tcx *SweepContext, ep, eq *Point, triangle *Triangle, point *Point, depth int) {
+	if depth > 100 {
+		return
+		panic("Exceeded recursion depth limit")
+	}
 
 	if isEdgeSideOfTriangle(triangle, ep, eq) {
 		return
+	}
+
+	if triangle == nil {
+		panic("nil triangle in sweepEdgeEvent")
 	}
 
 	var p1 *Point = triangle.pointCCW(point)
@@ -332,7 +344,7 @@ func sweepEdgeEvent(tcx *SweepContext, ep, eq *Point, triangle *Triangle, point 
 			// not change the given constraint and just keep a variable for the new constraint
 			tcx.edge_event.constrained_edge.q = p1
 			triangle = triangle.neighborAcross(point)
-			sweepEdgeEvent(tcx, ep, p1, triangle, p1)
+			sweepEdgeEvent(tcx, ep, p1, triangle, p1, depth+1)
 		} else {
 			panic(fmt.Sprintf("EdgeEvent - collinear points not supported"))
 		}
@@ -348,7 +360,7 @@ func sweepEdgeEvent(tcx *SweepContext, ep, eq *Point, triangle *Triangle, point 
 			// not change the given constraint and just keep a variable for the new constraint
 			tcx.edge_event.constrained_edge.q = p2
 			triangle = triangle.neighborAcross(point)
-			sweepEdgeEvent(tcx, ep, p2, triangle, p2)
+			sweepEdgeEvent(tcx, ep, p2, triangle, p2, depth+1)
 		} else {
 			panic(fmt.Sprintf("EdgeEvent - collinear points not supported"))
 		}
@@ -363,10 +375,14 @@ func sweepEdgeEvent(tcx *SweepContext, ep, eq *Point, triangle *Triangle, point 
 		} else {
 			triangle = triangle.neighborCW(point)
 		}
-		sweepEdgeEvent(tcx, ep, eq, triangle, point)
+		if triangle == nil {
+			panic("Didn't get neighbor")
+			return
+		}
+		sweepEdgeEvent(tcx, ep, eq, triangle, point, depth+1)
 	} else {
 		// This triangle crosses constraint so lets flippin start!
-		flipEdgeEvent(tcx, ep, eq, triangle, point)
+		flipEdgeEvent(tcx, ep, eq, triangle, point, depth+1)
 	}
 }
 
@@ -640,15 +656,24 @@ func fillLeftConcaveEdgeEvent(tcx *SweepContext, edge *Edge, node *Node) {
 	}
 }
 
-func flipEdgeEvent(tcx *SweepContext, ep, eq *Point, t *Triangle, p *Point) {
+func flipEdgeEvent(tcx *SweepContext, ep, eq *Point, t *Triangle, p *Point, depth int) {
+	if depth > 100 {
+		return
+		panic("Exceeded recursion depth limit")
+	}
 
 	var ot = t.neighborAcross(p)
 	var op = ot.oppositePoint(t, p)
 
 	if ot == nil {
+		return
 		// If we want to integrate the fillEdgeEvent do it here
 		// With current implementation we should never get here
 		panic(fmt.Sprintf("[BUG:FIXME] FLIP failed due to missing triangle"))
+	}
+
+	if t.getConstrainedEdgeAcross(p) {
+		panic("intersecting constraints")
 	}
 
 	if inScanArea(p, t.pointCCW(p), t.pointCW(p), op) {
@@ -665,16 +690,20 @@ func flipEdgeEvent(tcx *SweepContext, ep, eq *Point, t *Triangle, p *Point) {
 				legalize(tcx, ot)
 			} else {
 				// XXX: I think one of the triangles should be legalized here?
+				// panic("I think one of the triangles should be legalized here?")
 			}
 		} else {
 			var o = orient2d(eq, op, ep)
 			t = nextFlipTriangle(tcx, o, t, ot, p, op)
-			flipEdgeEvent(tcx, ep, eq, t, p)
+			flipEdgeEvent(tcx, ep, eq, t, p, depth+1)
 		}
 	} else {
 		var newP = nextFlipPoint(ep, eq, ot, op)
-		flipScanEdgeEvent(tcx, ep, eq, t, ot, newP)
-		sweepEdgeEvent(tcx, ep, eq, t, p)
+		if newP == nil {
+			return
+		}
+		flipScanEdgeEvent(tcx, ep, eq, t, ot, newP, depth+1)
+		sweepEdgeEvent(tcx, ep, eq, t, p, depth+1)
 	}
 }
 
@@ -705,27 +734,38 @@ func nextFlipPoint(ep, eq *Point, ot *Triangle, op *Point) *Point {
 	} else if o2d == CCW {
 		// Left
 		return ot.pointCW(op)
-	} else {
-		panic(fmt.Sprintf("[Unsupported] Opposing point on constrained edge"))
 	}
 	return nil
+	panic(fmt.Sprintf("[Unsupported] Opposing point on constrained edge"))
 }
 
-func flipScanEdgeEvent(tcx *SweepContext, ep, eq *Point, flip_triangle, t *Triangle, p *Point) {
+func flipScanEdgeEvent(tcx *SweepContext, ep, eq *Point, flip_triangle, t *Triangle, p *Point, depth int) {
+	if depth > 100 {
+		return
+		panic("Exceeded recursion depth limit")
+	}
+
+	if t == nil {
+		panic("triangle nil in flipScanEdgeEvent")
+	}
 
 	var ot = t.neighborAcross(p)
-	var op = ot.oppositePoint(t, p)
-
-	if t.neighborAcross(p) == nil {
+	if ot == nil {
+		return
 		// If we want to integrate the fillEdgeEvent do it here
 		// With current implementation we should never get here
 		//throw new RuntimeException( "[BUG:FIXME] FLIP failed due to missing triangle");
 		panic(fmt.Sprintf("[BUG:FIXME] FLIP failed due to missing triangle"))
 	}
+	var op = ot.oppositePoint(t, p)
+
+	if op == nil {
+		panic("op nil in flipScanEdgeEvent")
+	}
 
 	if inScanArea(eq, flip_triangle.pointCCW(eq), flip_triangle.pointCW(eq), op) {
 		// flip with new edge op.eq
-		flipEdgeEvent(tcx, eq, op, ot, op)
+		flipEdgeEvent(tcx, eq, op, ot, op, depth+1)
 		// TODO: Actually I just figured out that it should be possible to
 		//       improve this by getting the next ot and op before the the above
 		//       flip and continue the flipScanEdgeEvent here
@@ -735,6 +775,9 @@ func flipScanEdgeEvent(tcx *SweepContext, ep, eq *Point, flip_triangle, t *Trian
 		// so it will have to wait.
 	} else {
 		var newP = nextFlipPoint(ep, eq, ot, op)
-		flipScanEdgeEvent(tcx, ep, eq, flip_triangle, ot, newP)
+		if newP == nil {
+			return
+		}
+		flipScanEdgeEvent(tcx, ep, eq, flip_triangle, ot, newP, depth+1)
 	}
 }

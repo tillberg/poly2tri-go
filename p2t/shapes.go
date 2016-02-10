@@ -145,6 +145,8 @@ func (t *Triangle) markNeighbor2(t2 *Triangle) {
 	} else if t2.containsPoints(t.Point[0], t.Point[1]) {
 		t.neighbor[2] = t2
 		t2.markNeighbor(t.Point[0], t.Point[1], t)
+	} else {
+		panic("markNeighbor2 else")
 	}
 }
 
@@ -167,18 +169,20 @@ func (t *Triangle) markConstrainedEdge3(p, q *Point) {
 	} else if (q == t.Point[1] && p == t.Point[2]) ||
 		(q == t.Point[2] && p == t.Point[1]) {
 		t.constrained_edge[0] = true
+	} else {
+		panic("constrainedEdge3 else")
 	}
 }
 
 /**
  * Clears all references to all other triangles and Point
  */
-func (t *Triangle) clear() {
-	t.clearNeighbors()
-	t.Point[0] = nil
-	t.Point[1] = nil
-	t.Point[2] = nil
-}
+// func (t *Triangle) clear() {
+// 	t.clearNeighbors()
+// 	t.Point[0] = nil
+// 	t.Point[1] = nil
+// 	t.Point[2] = nil
+// }
 
 func (t *Triangle) clearNeighbor(t2 *Triangle) {
 	if t.neighbor[0] == t2 {
@@ -204,6 +208,9 @@ func (t *Triangle) clearDelunayEdges() {
 
 // The point counter-clockwise to given point
 func (t *Triangle) pointCW(point *Point) *Point {
+	if t == nil {
+		panic("triangle is nil in pointCW")
+	}
 	if point == t.Point[0] {
 		return t.Point[2]
 	} else if point == t.Point[1] {
@@ -347,6 +354,15 @@ func (t *Triangle) setConstrainedEdgeCW(p *Point, ce bool) {
 	} else {
 		t.constrained_edge[0] = ce
 	}
+}
+
+func (t *Triangle) getConstrainedEdgeAcross(p *Point) bool {
+	if p == t.Point[0] {
+		return t.constrained_edge[0]
+	} else if p == t.Point[1] {
+		return t.constrained_edge[1]
+	}
+	return t.constrained_edge[2]
 }
 
 func (t *Triangle) getDelunayEdgeCCW(p *Point) bool {

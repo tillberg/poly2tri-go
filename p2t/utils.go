@@ -30,9 +30,7 @@
  */
 package p2t
 
-import (
-	"math"
-)
+import "math"
 
 const M_PI_2 = math.Pi / 2
 const PI_3div4 = 3 * math.Pi / 4
@@ -59,6 +57,7 @@ func orient2d(pa, pb, pc *Point) int {
 	var detright = (pa.Y - pc.Y) * (pb.X - pc.X)
 	var val = detleft - detright
 	if val > -EPSILON && val < EPSILON {
+		// alog.Println("COLINEAR", val, *pa, *pb, *pc)
 		return COLLINEAR
 	} else if val > 0 {
 		return CCW

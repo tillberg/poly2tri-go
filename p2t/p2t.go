@@ -44,26 +44,38 @@ import (
 
 var tcx *SweepContext
 
-func Init(polyline PointArray) {
+func Init(polyline PointArray) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("p2t.Init panicked with: %#v", e)
+		}
+	}()
+
 	tcx = new(SweepContext)
 	tcx.init(polyline)
+	return err
 }
 
 // Returns the contstrained triangles
-func Triangulate() TriArray {
+func Triangulate() (triangles TriArray, err error) {
 	if tcx != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				err = fmt.Errorf("p2t.Triangle panicked with: %#v", e)
+			}
+		}()
 		triangulate(tcx)
 	} else {
 		panic(fmt.Sprintf("ERROR: p2t uninitialized"))
 	}
 	// Copy triangles from list to slice
-	var triangles = make(TriArray, tcx.triangles.Len())
+	triangles = make(TriArray, tcx.triangles.Len())
 	i := 0
 	for e := tcx.triangles.Front(); e != nil; e = e.Next() {
 		triangles[i] = e.Value.(*Triangle)
 		i++
 	}
-	return triangles
+	return triangles, err
 }
 
 func AddHole(polyline PointArray) {
